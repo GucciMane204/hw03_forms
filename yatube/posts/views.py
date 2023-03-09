@@ -1,57 +1,41 @@
-from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
-from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import PostForm
-from .models import Group, Post
-
-User = get_user_model()
-POST_VIEW_COUNT = 10
+from .models import Group, Post, User
+from .utils import make_page
 
 
 def index(request):
-    title = 'Последние обновления на сайте'
-    posts = Post.objects.all().order_by('-pub_date')
-    paginator = Paginator(posts, POST_VIEW_COUNT)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    context = {
-        'title': title,
-        'page_obj': page_obj,
-        'posts': posts,
-    }
-    return render(request, 'posts/index.html', context)
+    posts = Post.objects.select_related('group', 'author')
+    return render(
+        request, 'posts/index.html', {'page_obj': make_page(request, posts)}
+    )
 
 
 def group_posts(request, slug):
     group = get_object_or_404(Group, slug=slug)
-    title = f'Записи сообщества {group.title}'
-    posts = group.posts.all().order_by('-pub_date')
-    paginator = Paginator(posts, POST_VIEW_COUNT)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    context = {
-        'title': title,
-        'group': group,
-        'page_obj': page_obj,
-        'posts': posts,
-    }
-    return render(request, 'posts/group_list.html', context)
+    posts = group.posts.select_related('author')
+    return render(
+        request,
+        'posts/group_list.html',
+        {'group': group, 'page_obj': make_page(request, posts)},
+    )
 
 
 def profile(request, username):
-    author = User.objects.get(username=username)
-    posts = author.posts.all().order_by('-pub_date')
-    paginator = Paginator(posts, POST_VIEW_COUNT)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    context = {
-        'author': author,
-        'posts': posts,
-        'page_obj': page_obj,
-    }
-    return render(request, 'posts/profile.html', context)
+    author = get_object_or_404(User, username=username)
+    posts = Post.objects.select_related('group', 'author').filter(
+        author__username=username
+    )
+    return render(
+        request,
+        'posts/profile.html',
+        {
+            'author': author,
+            'page_obj': make_page(request, posts),
+        },
+    )
 
 
 def post_detail(request, post_id):
@@ -67,12 +51,12 @@ def post_detail(request, post_id):
 @login_required
 def post_create(request):
     if request.method == 'POST':
-        form = PostForm(request.POST)
+        form = PostForm(request.POST or None)
         if form.is_valid():
-            form.save(commit=False).author = request.user
+            post = form.save(commit=False)
+            post.author = request.user
             form.save()
             return redirect('posts:profile', username=request.user)
-        return render(request, 'posts/create_post.html', {'form': form})
     form = PostForm()
     return render(request, 'posts/create_post.html', {'form': form})
 
