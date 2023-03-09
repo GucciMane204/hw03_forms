@@ -99,6 +99,7 @@ STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 NUMBER_OF_POSTS: int = 10
+NUMBER_OF_POSTS_PAGE_TWO: int = 3
 LOGIN_URL = 'users:login'
 LOGIN_REDIRECT_URL = 'posts:index'
 # LOGOUT_REDIRECT_URL = 'posts:index'
